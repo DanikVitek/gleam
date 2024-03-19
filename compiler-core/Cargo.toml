@@ -73,5 +73,6 @@ capnpc = "0.14.4"
 [dev-dependencies]
 pretty_assertions.workspace = true
 insta.workspace = true
+proptest.workspace = true
 # Random value generation
 rand = "0.8.5"

@@ -937,7 +937,7 @@ where
                     match name.as_str() {
                         "true" | "false" => {
                             return parse_error(
-                                ParseErrorType::LowcaseBooleanPattern,
+                                ParseErrorType::LowercaseBooleanPattern,
                                 SrcSpan { start, end },
                             )
                         }

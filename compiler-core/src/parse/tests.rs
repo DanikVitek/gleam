@@ -5,6 +5,7 @@ use crate::parse::error::{
 use camino::Utf8PathBuf;
 
 use pretty_assertions::assert_eq;
+use proptest::proptest;
 
 macro_rules! assert_error {
     ($src:expr, $error:expr $(,)?) => {
@@ -58,60 +59,77 @@ pub fn expect_error(src: &str) -> String {
     error.pretty_string()
 }
 
-#[test]
-fn int_tests() {
-    // bad binary digit
-    assert_error!(
-        "0b012",
-        ParseError {
-            error: ParseErrorType::LexError {
-                error: LexicalError {
-                    error: LexicalErrorType::DigitOutOfRadix,
-                    location: SrcSpan { start: 4, end: 4 },
-                }
-            },
-            location: SrcSpan { start: 4, end: 4 },
-        }
-    );
-    // bad octal digit
-    assert_error!(
-        "0o12345678",
-        ParseError {
-            error: ParseErrorType::LexError {
-                error: LexicalError {
-                    error: LexicalErrorType::DigitOutOfRadix,
-                    location: SrcSpan { start: 9, end: 9 },
-                }
-            },
-            location: SrcSpan { start: 9, end: 9 },
-        }
-    );
-    // no int value
-    assert_error!(
-        "0x",
-        ParseError {
-            error: ParseErrorType::LexError {
-                error: LexicalError {
-                    error: LexicalErrorType::RadixIntNoValue,
-                    location: SrcSpan { start: 1, end: 1 },
-                }
-            },
-            location: SrcSpan { start: 1, end: 1 },
-        }
-    );
-    // trailing underscore
-    assert_error!(
-        "1_000_",
-        ParseError {
-            error: ParseErrorType::LexError {
-                error: LexicalError {
-                    error: LexicalErrorType::NumTrailingUnderscore,
-                    location: SrcSpan { start: 5, end: 5 },
-                }
-            },
-            location: SrcSpan { start: 5, end: 5 },
-        }
-    );
+proptest! {
+    #[test]
+    fn parse_bad_binary_int(s in r#"0b[01]*[2-9a-fA-F]+"#) {
+        let len = s.len() as u32;
+        let location = SrcSpan { start: len - 1, end: len - 1 };
+        assert_error!(
+            &s,
+            ParseError {
+                error: ParseErrorType::LexError {
+                    error: LexicalError {
+                        error: LexicalErrorType::DigitOutOfRadix,
+                        location,
+                    }
+                },
+                location,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_bad_octal_int(s in r#"0o[0-7]*[8-9a-fA-F]+"#) {
+        let len = s.len() as u32;
+        let location = SrcSpan { start: len - 1, end: len - 1 };
+        assert_error!(
+            &s,
+            ParseError {
+                error: ParseErrorType::LexError {
+                    error: LexicalError {
+                        error: LexicalErrorType::DigitOutOfRadix,
+                        location,
+                    }
+                },
+                location,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_bad_radix_int(s in r#"0[xob][^0-9a-fA-F]*"#) {
+        let location = SrcSpan { start: 1, end: 1 };
+        assert_error!(
+            &s,
+            ParseError {
+                error: ParseErrorType::LexError {
+                    error: LexicalError {
+                        error: LexicalErrorType::RadixIntNoValue,
+                        location,
+                    }
+                },
+                location,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_bad_int_trailing_underscore(s in r#"([0-9]_?)*[0-9]_"#) {
+        let len = s.len() as u32;
+        let location = SrcSpan { start: len - 1, end: len - 1 };
+        assert_error!(
+            &s,
+            ParseError {
+                error: ParseErrorType::LexError {
+                    error: LexicalError {
+                        error: LexicalErrorType::NumTrailingUnderscore,
+                        location,
+                    }
+                },
+                location,
+            }
+        );
+    }
 }
 
 #[test]
@@ -273,7 +291,7 @@ fn string_invalid_unicode_escape_sequence() {
 }
 
 #[test]
-fn bit_array() {
+fn bit_array_too_small_unit() {
     // non int value in bit array unit option
     assert_error!(
         "let x = <<1:unit(0)>> x",
@@ -284,15 +302,19 @@ fn bit_array() {
     );
 }
 
-#[test]
-fn bit_array1() {
-    assert_error!(
-        "let x = <<1:unit(257)>> x",
-        ParseError {
-            error: ParseErrorType::InvalidBitArrayUnit,
-            location: SrcSpan { start: 17, end: 20 }
-        }
-    );
+proptest! {
+    #[test]
+    fn bit_array_too_big_unit(n in 257..u32::MAX) {
+        let src = format!("let x = <<1:unit({})>> x", n);
+        //                                  ^ 17
+        assert_error!(
+            &src,
+            ParseError {
+                error: ParseErrorType::InvalidBitArrayUnit,
+                location: SrcSpan { start: 17, end: 17 + n.to_string().len() as u32 }
+            }
+        );
+    }
 }
 
 #[test]
@@ -307,52 +329,63 @@ fn bit_array2() {
     );
 }
 
-#[test]
-fn name() {
-    assert_error!(
-        "let xS = 1",
-        ParseError {
-            error: ParseErrorType::LexError {
-                error: LexicalError {
-                    error: LexicalErrorType::BadName { name: "xS".into() },
-                    location: SrcSpan { start: 4, end: 6 },
-                }
-            },
-            location: SrcSpan { start: 4, end: 6 },
-        }
-    );
-}
+proptest! {
+    #[test]
+    fn bad_name(name in r#"[a-z][a-z0-9_]*([A-Z][a-zA-Z0-9_]*)+"#) {
+        let src = format!("let {} = 1", name);
+        //                     ^ 4
+        let location = SrcSpan { start: 4, end: 4 + name.len() as u32 };
+        assert_error!(
+            &src,
+            ParseError {
+                error: ParseErrorType::LexError {
+                    error: LexicalError {
+                        error: LexicalErrorType::BadName { name },
+                        location,
+                    }
+                },
+                location,
+            }
+        );
+    }
 
-#[test]
-fn name1() {
-    assert_error!(
-        "let _xS = 1",
-        ParseError {
-            error: ParseErrorType::LexError {
-                error: LexicalError {
-                    error: LexicalErrorType::BadDiscardName { name: "_xS".into() },
-                    location: SrcSpan { start: 4, end: 7 },
-                }
-            },
-            location: SrcSpan { start: 4, end: 7 },
-        }
-    );
-}
+    #[test]
+    fn bad_discard_name(name in r#"_[a-zA-Z0-9_]*([A-Z][a-zA-Z0-9_]*)+"#) {
+        let src = format!("let {} = 1", name);
+        //                     ^ 4
+        let location = SrcSpan { start: 4, end: 4 + name.len() as u32 };
+        assert_error!(
+            &src,
+            ParseError {
+                error: ParseErrorType::LexError {
+                    error: LexicalError {
+                        error: LexicalErrorType::BadDiscardName { name },
+                        location,
+                    }
+                },
+                location,
+            }
+        );
+    }
 
-#[test]
-fn name2() {
-    assert_error!(
-        "type S_m = String",
-        ParseError {
-            error: ParseErrorType::LexError {
-                error: LexicalError {
-                    error: LexicalErrorType::BadUpname { name: "S_m".into() },
-                    location: SrcSpan { start: 5, end: 8 },
-                }
-            },
-            location: SrcSpan { start: 5, end: 8 },
-        }
-    );
+    #[test]
+    fn bad_upname(name in r#"[A-Z][a-zA-Z0-9_]*(_[a-zA-Z0-9]*)+"#) {
+        let src = format!("type {} = String", name);
+        //                      ^ 5
+        let location = SrcSpan { start: 5, end: 5 + name.len() as u32 };
+        assert_error!(
+            &src,
+            ParseError {
+                error: ParseErrorType::LexError {
+                    error: LexicalError {
+                        error: LexicalErrorType::BadUpname { name },
+                        location,
+                    }
+                },
+                location,
+            }
+        );
+    }
 }
 
 // https://github.com/gleam-lang/gleam/issues/1231
@@ -369,11 +402,11 @@ fn pointless_spread() {
 
 // https://github.com/gleam-lang/gleam/issues/1358
 #[test]
-fn lowcase_bool_in_pattern() {
+fn lowercase_bool_in_pattern() {
     assert_error!(
         "case 42 > 42 { true -> 1; false -> 2; }",
         ParseError {
-            error: ParseErrorType::LowcaseBooleanPattern,
+            error: ParseErrorType::LowercaseBooleanPattern,
             location: SrcSpan { start: 15, end: 19 },
         }
     );
@@ -383,7 +416,8 @@ fn lowcase_bool_in_pattern() {
 #[test]
 fn anonymous_function_labeled_arguments() {
     assert_error!(
-        "let anon_subtract = fn (minuend a: Int, subtrahend b: Int) -> Int {
+        "\
+let anon_subtract = fn (minuend a: Int, subtrahend b: Int) -> Int {
   a - b
 }",
         ParseError {

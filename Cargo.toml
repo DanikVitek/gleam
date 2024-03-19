@@ -58,3 +58,5 @@ thiserror = "1.0.58"
 pretty_assertions = "1.4.0"
 # Snapshot testing to make test maintenance easier
 insta = "1.36.1"
+# Property-based testing to make test coverage more thorough through the use of randomised inputs
+proptest = "1.4.0"

@@ -11,24 +11,42 @@ pub struct LexicalError {
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum InvalidUnicodeEscapeError {
-    MissingOpeningBrace,          // Expected '{'
-    ExpectedHexDigitOrCloseBrace, // Expected hex digit or '}'
-    InvalidNumberOfHexDigits,     // Expected between 1 and 6 hex digits
-    InvalidCodepoint,             // Invalid Unicode codepoint
+    /// Expected `{`
+    MissingOpeningBrace,
+    /// Expected hex digit or `}`
+    ExpectedHexDigitOrCloseBrace,
+    /// Expected between 1 and 6 hex digits
+    InvalidNumberOfHexDigits,
+    /// Invalid Unicode codepoint
+    InvalidCodepoint,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum LexicalErrorType {
-    BadStringEscape,                                 // string contains an unescaped slash
-    InvalidUnicodeEscape(InvalidUnicodeEscapeError), // \u{...} escape sequence is invalid
-    DigitOutOfRadix,                                 // 0x012 , 2 is out of radix
-    NumTrailingUnderscore,                           // 1_000_ is not allowed
-    RadixIntNoValue,                                 // 0x, 0b, 0o without a value
-    UnexpectedStringEnd,                             // Unterminated string literal
-    UnrecognizedToken { tok: char },
-    BadName { name: String },
-    BadDiscardName { name: String },
-    BadUpname { name: String },
+    /// string contains an unescaped slash
+    BadStringEscape,
+    /// `\u{...}` escape sequence is invalid
+    InvalidUnicodeEscape(InvalidUnicodeEscapeError),
+    /// e.g. in `0b012` digit `2` is out of radix
+    DigitOutOfRadix,
+    /// `1_000_` is not allowed
+    NumTrailingUnderscore,
+    /// `0x`, `0b`, `0o` without a value
+    RadixIntNoValue,
+    /// Unterminated string literal
+    UnexpectedStringEnd,
+    UnrecognizedToken {
+        tok: char,
+    },
+    BadName {
+        name: String,
+    },
+    BadDiscardName {
+        name: String,
+    },
+    BadUpname {
+        name: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -170,7 +188,7 @@ utf16_codepoint, utf32_codepoint, signed, unsigned, big, little, native, size, u
                 "This is a reserved word",
                 vec!["Hint: I was expecting to see a name here.".into()],
             ),
-            ParseErrorType::LowcaseBooleanPattern => (
+            ParseErrorType::LowercaseBooleanPattern => (
                 "Did you want a Bool instead of a variable?",
                 vec![
                     "Hint: In Gleam boolean literals are `True` and `False`.".into(),
@@ -229,55 +247,93 @@ utf16_codepoint, utf32_codepoint, signed, unsigned, big, little, native, size, u
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseErrorType {
-    ExpectedEqual,              // expect "="
-    ExpectedExpr,               // after "->" in a case clause
-    ExpectedName,               // any token used when a Name was expected
-    ExpectedPattern,            // after ':' where a pattern is expected
-    ExpectedType,               // after ':' or '->' where a type annotation is expected
-    ExpectedUpName,             // any token used when a UpName was expected
-    ExpectedValue,              // no value after "="
-    ExpectedStatement,          // no statement after "@<name>"
-    ExpectedDefinition,         // after attributes
-    ExpectedFunctionDefinition, // after function-only attributes
-    ExprLparStart,              // it seems "(" was used to start an expression
-    ExtraSeparator,             // #(1,,) <- the 2nd comma is an extra separator
-    IncorrectName,              // UpName or DiscardName used when Name was expected
-    IncorrectUpName,            // Name or DiscardName used when UpName was expected
-    InvalidBitArraySegment,     // <<7:hello>> `hello` is an invalid BitArray segment
-    InvalidBitArrayUnit,        // in <<1:unit(x)>> x must be 1 <= x <= 256
-    InvalidTailPattern,         // only name and _name are allowed after ".." in list pattern
-    InvalidTupleAccess,         // only positive int literals for tuple access
+    /// expect `=`
+    ExpectedEqual,
+    /// after `->` in a case clause
+    ExpectedExpr,
+    /// any token used when a `Name` was expected
+    ExpectedName,
+    /// after `:` where a pattern is expected
+    ExpectedPattern,
+    /// after `:` or `->` where a type annotation is expected
+    ExpectedType,
+    /// any token used when an `UpName` was expected
+    ExpectedUpName,
+    /// no value after `=`
+    ExpectedValue,
+    /// no statement after `@<name>`
+    ExpectedStatement,
+    /// after attributes
+    ExpectedDefinition,
+    /// after function-only attributes
+    ExpectedFunctionDefinition,
+    /// it seems `(` was used to start an expression
+    ExprLparStart,
+    /// e.g. in `#(1,,) <-` the 2nd comma is an extra separator
+    ExtraSeparator,
+    /// `UpName` or `DiscardName` used when `Name` was expected
+    IncorrectName,
+    /// `Name` or `DiscardName` used when `UpName` was expected
+    IncorrectUpName,
+    /// e.g. in `<<7:hello>>` `"hello"` is an invalid BitArray segment
+    InvalidBitArraySegment,
+    /// e.g in `<<1:unit(x)>>` `x` must be `1 <= x <= 256`
+    InvalidBitArrayUnit,
+    /// only `name` and `_name` are allowed after `..` in list pattern
+    InvalidTailPattern,
+    /// only positive int literals for tuple access
+    InvalidTupleAccess,
     LexError {
         error: LexicalError,
     },
-    NestedBitArrayPattern,        // <<<<1>>, 2>>, <<1>> is not allowed in there
-    NoCaseClause,                 // a case with no clauses
-    NoExpression, // between "{" and "}" in expression position, there must be an expression
-    NoLetBinding, // Bindings and rebinds always require let and must always bind to a value.
-    NoValueAfterEqual, // = <something other than a value>
-    NotConstType, // :fn(), name, _  are not valid const types
-    OpNakedRight, // Operator with no value to the right
-    OpaqueTypeAlias, // Type aliases cannot be opaque
-    TooManyArgHoles, // a function call can have at most 1 arg hole
-    DuplicateAttribute, // an attribute was used more than once
-    UnknownAttribute, // an attribute was used that is not known
-    UnknownTarget, // an unknown target was used
-    ListSpreadWithoutElements, // Pointless spread: `[..xs]`
-    ListSpreadFollowedByElements, // trying to append something after the spread: `[..xs, x]`
-    LowcaseBooleanPattern, // most likely user meant True or False in patterns
-    UnexpectedLabel, // argument labels were provided, but are not supported in this context
+    /// e.g. in `<<<<1>>, 2>>` the `<<1>>` is not allowed in there
+    NestedBitArrayPattern,
+    /// a case with no clauses
+    NoCaseClause,
+    /// between `{` and `}` in expression position, there must be an expression
+    NoExpression,
+    /// Bindings and rebinds always require `let` and must always bind to a value.
+    NoLetBinding,
+    /// `= <something other than a value>`
+    NoValueAfterEqual,
+    /// `:fn()`, `name`, `_` are not valid `const` types
+    NotConstType,
+    /// Operator with no value to the right
+    OpNakedRight,
+    /// Type aliases cannot be opaque
+    OpaqueTypeAlias,
+    /// a function call can have at most 1 arg hole
+    TooManyArgHoles,
+    /// an attribute was used more than once
+    DuplicateAttribute,
+    /// an attribute was used that is not known
+    UnknownAttribute,
+    /// an unknown target was used
+    UnknownTarget,
+    /// Pointless spread: `[..xs]`
+    ListSpreadWithoutElements,
+    /// trying to append something after the spread: `[..xs, x]`
+    ListSpreadFollowedByElements,
+    /// most likely user meant `True` or `False` in patterns
+    LowercaseBooleanPattern,
+    /// argument labels were provided, but are not supported in this context
+    UnexpectedLabel,
     UnexpectedEof,
-    UnexpectedReservedWord, // reserved word used when a name was expected
+    /// reserved word used when a name was expected
+    UnexpectedReservedWord,
     UnexpectedToken {
         expected: Vec<EcoString>,
         hint: Option<EcoString>,
     },
     ExpectedBoolean,
-    UnexpectedFunction, // a function was used called outside of another function
-    // A variable was assigned or discarded on the left hand side of a <> pattern
+    /// a function was used called outside of another function
+    UnexpectedFunction,
+    /// A variable was assigned or discarded on the left hand side of a `<>` pattern
     ConcatPatternVariableLeftHandSide,
-    ListSpreadWithoutTail, // let x = [1, ..]
-    ExpectedFunctionBody,  // let x = fn()
+    /// `let x = [1, ..]`
+    ListSpreadWithoutTail,
+    /// `let x = fn()`
+    ExpectedFunctionBody,
 }
 
 impl LexicalError {

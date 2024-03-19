@@ -14,6 +14,7 @@
     "camino",
     "cksum",
     "codegen",
+    "docvec",
     "ecow",
     "flate",
     "hardlinking",
@@ -27,6 +28,7 @@
     "Telem",
     "Unretire",
     "Untar",
+    "Upname",
     "walkdir"
   ],
   "cSpell.language": "en,uk,en-GB,en-US"
